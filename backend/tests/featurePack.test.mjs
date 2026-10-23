@@ -1,0 +1,7 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { filterRecords, recordsToCsv, recordsToJson, runFallbackAi, AI_KINDS } from "../featurePack.mjs";
+const rows=[{id:1,reference:"A-1",title:"Alpha case",status:"Open",risk:"High",amount:100},{id:2,reference:"B-2",title:"Beta case",status:"Closed",risk:"Low",amount:0}];
+test("search/filter on main list",()=>{ assert.equal(filterRecords(rows,{q:"alpha"}).length,1); assert.equal(filterRecords(rows,{status:"Closed"})[0].reference,"B-2"); assert.equal(filterRecords(rows,{risk:"High"}).length,1); assert.equal(filterRecords(rows,{q:"missing"}).length,0); });
+test("CSV/JSON export preserves 0/false/empty",()=>{ assert.match(recordsToCsv(rows),/Alpha case/); assert.match(recordsToCsv([]),/id,reference/); const j=JSON.parse(recordsToJson(rows)); assert.equal(j.count,2); assert.equal(j.items[1].amount,0); });
+test("domain AI fallback is deterministic and labelled aiGenerated:false (offline, no provider)",()=>{ assert.ok(AI_KINDS.length>=2 && AI_KINDS.length<=3); for(const k of AI_KINDS){ const r=runFallbackAi(k.id,rows); assert.equal(r.aiGenerated,false); assert.match(r.label,/Deterministic fallback/); assert.equal(r.metrics.recordCount,2); assert.equal(r.metrics.totalAmount,100); } const empty=runFallbackAi(AI_KINDS[0].id,[]); assert.equal(empty.aiGenerated,false); assert.equal(empty.metrics.recordCount,0); assert.equal(empty.metrics.hasRecords,false); assert.equal(empty.metrics.empty,true); assert.equal(runFallbackAi("nope",rows),null); });
